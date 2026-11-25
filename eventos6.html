@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Gestão Completo - Eventos, Clientes, PDV & Caixa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800 antialiased min-h-screen flex flex-col">
+
+    <!-- HEADER -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-20">
+        <div class="max-w-[1440px] mx-auto px-6 h-16 flex items-center justify-between gap-4">
+            <div onclick="navegarPara('dashboard')" class="flex items-center gap-2.5 cursor-pointer shrink-0">
+                <div class="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                    <i data-lucide="sparkles" class="w-5 h-5"></i>
+                </div>
+                <span class="text-lg font-extrabold tracking-wide text-indigo-700 uppercase">SEU LOGO</span>
+            </div>
+            <div class="relative flex-1 max-w-md hidden sm:block">
+                <input type="text" id="busca-global" onkeyup="executarBuscaGlobal(this.value)" placeholder="Pesquisar eventos, clientes ou fornecedores..." class="w-full pl-4 pr-10 py-2 text-sm bg-gray-100 border border-transparent focus:border-indigo-300 focus:bg-white rounded-lg focus:outline-none transition">
+                <i data-lucide="search" class="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="abrirModalCliente()" class="hidden md:flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-2 rounded-lg transition">
+                    <i data-lucide="user-plus" class="w-4 h-4"></i> Novo Cliente
+                </button>
+                <button onclick="abrirModalEvento()" class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-sm transition">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Novo Evento
+                </button>
+                <div class="flex items-center gap-2 pl-3 border-l border-gray-200 text-sm text-gray-600">
+                    <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                        <i data-lucide="user" class="w-4 h-4"></i>
+                    </div>
+                    <span class="hidden lg:inline font-medium">administrador</span>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gray-50 border-t border-gray-200/80 px-6 py-2.5">
+            <div class="max-w-[1440px] mx-auto flex items-center justify-between text-xs text-gray-500">
+                <h1 id="titulo-pagina" class="text-base font-bold text-gray-800">Painel</h1>
+                <div class="flex items-center gap-1.5">
+                    <i data-lucide="home" class="w-3.5 h-3.5 text-gray-400"></i>
+                    <span>/</span>
+                    <span id="breadcrumb-atual" class="font-medium text-indigo-600">Painel</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-[1440px] w-full mx-auto px-6 py-6 flex flex-col md:flex-row gap-6 flex-1">
+        
+        <!-- SIDEBAR -->
+        <aside class="w-full md:w-60 shrink-0">
+            <div class="bg-white rounded-xl border border-gray-200/90 shadow-sm p-3 sticky top-28">
+                <nav class="space-y-1" id="menu-navegacao">
+                    <button onclick="navegarPara('dashboard')" id="nav-dashboard" class="w-full flex items-center justify-between px-3.5 py-2.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-semibold transition-colors">
+                        <span class="flex items-center gap-2.5"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Painel</span>
+                    </button>
+                    <button onclick="navegarPara('eventos')" id="nav-eventos" class="w-full flex items-center justify-between px-3.5 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-lg text-sm font-medium transition-colors">
+                        <span class="flex items-center gap-2.5"><i data-lucide="calendar" class="w-4 h-4"></i> Eventos</span>
+                        <span id="badge-menu-eventos" class="text-[11px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full">0</span>
+                    </button>
+                    <button onclick="navegarPara('clientes')" id="nav-clientes" class="w-full flex items-center justify-between px-3.5 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-lg text-sm font-medium transition-colors">
+                        <span class="flex items-center gap-2.5"><i data-lucide="users" class="w-4 h-4"></i> Clientes</span>
+                        <span id="badge-menu-clientes" class="text-[11px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full">0</span>
+                    </button>
+                    <button onclick="navegarPara('pdv')" id="nav-pdv" class="w-full flex items-center justify-between px-3.5 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-lg text-sm font-medium transition-colors">
+                        <span class="flex items-center gap-2.5"><i data-lucide="shopping-cart" class="w-4 h-4"></i> PDV / Comandas</span>
+                        <span id="badge-menu-comandas" class="text-[11px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full">0</span>
+                    </button>
+                    <button onclick="navegarPara('caixa')" id="nav-caixa" class="w-full flex items-center justify-between px-3.5 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-lg text-sm font-medium transition-colors">
+                        <span class="flex items-center gap-2.5"><i data-lucide="wallet" class="w-4 h-4"></i> Caixa</span>
+                    </button>
+                    <button onclick="navegarPara('fiados')" id="nav-fiados" class="w-full flex items-center justify-between px-3.5 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-lg text-sm font-medium transition-colors">
+                        <span class="flex items-center gap-2.5"><i data-lucide="notebook-pen" class="w-4 h-4"></i> Fiados</span>
+                        <span id="badge-menu-fiados" class="text-[11px] bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full">0</span>
+                    </button>
+                    <button onclick="navegarPara('estoque')" id="nav-estoque" class="w-full flex items-center justify-between px-3.5 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-lg text-sm font-medium transition-colors">
+                        <span class="flex items-center gap-2.5"><i data-lucide="boxes" class="w-4 h-4"></i> Produtos & Estoque</span>
+                    </button>
+                    <button onclick="navegarPara('fornecedores')" id="nav-fornecedores" class="w-full flex items-center justify-between px-3.5 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-lg text-sm font-medium transition-colors">
+                        <span class="flex items-center gap-2.5"><i data-lucide="truck" class="w-4 h-4"></i> Fornecedores</span>
+                        <span id="badge-menu-fornecedores" class="text-[11px] bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full">0</span>
+                    </button>
+                    <button onclick="navegarPara('relatorios')" id="nav-relatorios" class="w-full flex items-center justify-between px-3.5 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-lg text-sm font-medium transition-colors">
+                        <span class="flex items-center gap-2.5"><i data-lucide="bar-chart-3" class="w-4 h-4"></i> Relatórios & Lucro</span>
+                    </button>
+                </nav>
+            </div>
+        </aside>
+
+        <!-- CONTEÚDO -->
+        <main class="flex-1 min-w-0 space-y-6">
+
+            <!-- DASHBOARD -->
+            <div id="aba-dashboard" class="space-y-6">
+                <section class="bg-white rounded-xl border border-gray-200/90 shadow-sm p-6 space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                            <i data-lucide="calendar-check" class="w-5 h-5 text-indigo-600"></i> Resumo dos eventos
+                        </h2>
+                        <button onclick="navegarPara('eventos')" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                            <i data-lucide="settings-2" class="w-3.5 h-3.5"></i> Gerenciar Eventos
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div onclick="navegarPara('eventos')" class="cursor-pointer bg-indigo-600 hover:bg-indigo-700 transition text-white rounded-lg p-5 relative overflow-hidden shadow-sm">
+                            <i data-lucide="calendar-plus" class="w-6 h-6 text-indigo-300/70 absolute top-3 right-3"></i>
+                            <div class="text-center mt-1">
+                                <p id="kpi-eventos" class="text-3xl font-extrabold">0</p>
+                                <p class="text-xs font-medium text-indigo-100 mt-1">Eventos adicionados</p>
+                            </div>
+                        </div>
+                        <div onclick="navegarPara('eventos')" class="cursor-pointer bg-purple-600 hover:bg-purple-700 transition text-white rounded-lg p-5 relative overflow-hidden shadow-sm">
+                            <i data-lucide="check-circle-2" class="w-6 h-6 text-purple-300/70 absolute top-3 right-3"></i>
+                            <div class="text-center mt-1">
+                                <p id="kpi-eventos-confirmados" class="text-3xl font-extrabold">0</p>
+                                <p class="text-xs font-medium text-purple-100 mt-1">Eventos confirmados</p>
+                            </div>
+                        </div>
+                        <div onclick="navegarPara('clientes')" class="cursor-pointer bg-violet-600 hover:bg-violet-700 transition text-white rounded-lg p-5 relative overflow-hidden shadow-sm">
+                            <i data-lucide="user-check" class="w-6 h-6 text-violet-300/70 absolute top-3 right-3"></i>
+                            <div class="text-center mt-1">
+                                <p id="kpi-pagos" class="text-3xl font-extrabold">0</p>
+                                <p class="text-xs font-medium text-violet-100 mt-1">Pagamentos concluídos</p>
+                            </div>
+                        </div>
+                        <div onclick="navegarPara('relatorios')" class="cursor-pointer bg-indigo-800 hover:bg-indigo-900 transition text-white rounded-lg p-5 relative overflow-hidden shadow-sm">
+                            <i data-lucide="trending-up" class="w-6 h-6 text-indigo-400/70 absolute top-3 right-3"></i>
+                            <div class="text-center mt-1">
+                                <p id="kpi-lucro-dashboard" class="text-2xl font-extrabold">R$ 0,00</p>
+                                <p class="text-xs font-medium text-indigo-200 mt-1">Lucro líquido atual</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto border border-gray-100 rounded-lg">
+                        <table class="w-full text-left text-sm text-gray-600">
+                            <thead class="bg-gray-50 text-gray-600 font-semibold text-xs border-b">
+                                <tr>
+                                    <th class="p-3.5">Evento(s)</th>
+                                    <th class="p-3.5">Local</th>
+                                    <th class="p-3.5">Gasto Previsto</th>
+                                    <th class="p-3.5">Capacidade / Ocupação</th>
+                                    <th class="p-3.5">Status</th>
+                                    <th class="p-3.5 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-resumo-eventos" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200/90 shadow-sm p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-base font-bold text-gray-800">Faturamento por Evento</h3>
+                                <p class="text-xs text-gray-400">Comparativo de valores contratados por evento</p>
+                            </div>
+                            <span class="px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-full">Tempo Real</span>
+                        </div>
+                        <div class="h-64"><canvas id="grafico-eventos"></canvas></div>
+                    </div>
+                    <div class="bg-white rounded-xl border border-gray-200/90 shadow-sm p-6 flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-base font-bold text-gray-800">Formas de Pagamento</h3>
+                            <p class="text-xs text-gray-400 mb-4">Distribuição entre Dinheiro, PIX e Cartão</p>
+                        </div>
+                        <div class="h-52 flex items-center justify-center"><canvas id="grafico-pagamentos"></canvas></div>
+                        <div class="mt-4 pt-3 border-t border-gray-100 flex justify-between text-xs text-gray-500">
+                            <span>Estoque crítico:</span>
+                            <button onclick="navegarPara('estoque')" id="kpi-alerta" class="font-bold text-indigo-600 hover:underline">0 Itens</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- EVENTOS -->
+            <section id="aba-eventos" class="hidden space-y-6">
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Gerenciamento de Eventos</h2>
+                            <p class="text-sm text-gray-500">Crie, edite informações, defina o preço gasto em cada evento e altere status.</p>
+                        </div>
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <div class="px-3 py-1.5 bg-rose-50 border border-rose-200 rounded-lg text-xs">
+                                <span class="text-gray-600">Gasto Total nos Eventos:</span>
+                                <strong id="ev-total-gastos" class="text-rose-600 ml-1">R$ 0,00</strong>
+                            </div>
+                            <input type="text" onkeyup="filtrarTabela('tabela-eventos', this.value)" placeholder="Filtrar eventos..." class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button onclick="abrirModalEvento()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                                <i data-lucide="plus" class="w-4 h-4"></i> Novo Evento
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-600">
+                            <thead class="bg-gray-50 text-gray-700 font-semibold uppercase text-xs">
+                                <tr>
+                                    <th class="p-4">Nome do Evento</th>
+                                    <th class="p-4">Data</th>
+                                    <th class="p-4">Local</th>
+                                    <th class="p-4">Capacidade</th>
+                                    <th class="p-4">Preço Gasto</th>
+                                    <th class="p-4">Observações</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-eventos" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CLIENTES -->
+            <section id="aba-clientes" class="hidden space-y-6">
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Clientes e Pagamentos</h2>
+                            <p class="text-sm text-gray-500">Marque clientes, escolha a forma de pagamento e entre em contato via WhatsApp ou Ligação.</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="text" onkeyup="filtrarTabela('tabela-clientes', this.value)" placeholder="Buscar cliente..." class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button onclick="abrirModalCliente()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                                <i data-lucide="user-plus" class="w-4 h-4"></i> Novo Cliente
+                            </button>
+                        </div>
+                    </div>
+                    <div id="barra-selecao-clientes" class="hidden bg-indigo-50 border-b border-indigo-100 px-6 py-3 flex flex-wrap items-center justify-between gap-4 text-sm">
+                        <div class="flex items-center gap-2 text-indigo-900 font-medium">
+                            <i data-lucide="check-square" class="w-4 h-4 text-indigo-600"></i>
+                            <span><strong id="qtd-clientes-marcados">0</strong> cliente(s) marcado(s)</span>
+                            <span class="text-indigo-300">|</span>
+                            <span>Total selecionado: <strong id="soma-clientes-marcados">R$ 0,00</strong></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="marcarSelecionadosComoPagos()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition">Marcar como Pago</button>
+                            <button onclick="apagarClientesSelecionados()" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition">Apagar Marcados</button>
+                            <button onclick="limparSelecaoClientes()" class="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-xs font-medium rounded-lg transition">Limpar Seleção</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-600">
+                            <thead class="bg-gray-50 text-gray-700 font-semibold uppercase text-xs">
+                                <tr>
+                                    <th class="p-4 w-10"><input type="checkbox" id="selecionar-todos-clientes" onchange="alternarTodosClientes(this)" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer" title="Marcar todos"></th>
+                                    <th class="p-4">Cliente & Contato Rápido</th>
+                                    <th class="p-4">Dados</th>
+                                    <th class="p-4">Evento</th>
+                                    <th class="p-4">Valor Total</th>
+                                    <th class="p-4">Forma de Pagamento</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-clientes" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PDV -->
+            <section id="aba-pdv" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                        <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <i data-lucide="user-check" class="w-5 h-5 text-indigo-600"></i> 1. Quem está comprando?
+                        </h3>
+                        <select id="pdv-cliente" class="w-full border rounded-lg p-2 text-sm mb-3"><option value="">-- Selecione o cliente --</option></select>
+                        <select id="pdv-evento" class="w-full border rounded-lg p-2 text-sm mb-3"><option value="">-- Selecione o evento --</option></select>
+                        <button onclick="abrirNovaComanda()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+                            <i data-lucide="plus" class="w-4 h-4 inline"></i> Abrir Comanda
+                        </button>
+                        <div class="mt-6">
+                            <h4 class="text-sm font-bold text-gray-800 mb-2">Comandas em aberto</h4>
+                            <div id="lista-comandas-abertas" class="space-y-2"></div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                        <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <i data-lucide="package" class="w-5 h-5 text-indigo-600"></i> 2. O que ele pegou?
+                        </h3>
+                        <input type="text" id="pdv-busca-produto" onkeyup="filtrarProdutosPDV(this.value)" placeholder="Buscar produto..." class="w-full border rounded-lg px-3 py-2 text-sm mb-3">
+                        <div id="lista-produtos-pdv" class="space-y-2 max-h-96 overflow-y-auto"></div>
+                    </div>
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                        <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <i data-lucide="receipt" class="w-5 h-5 text-indigo-600"></i> Comanda Atual
+                        </h3>
+                        <div id="comanda-itens" class="space-y-2 min-h-[100px] max-h-64 overflow-y-auto border-b pb-3 mb-3">
+                            <p class="text-xs text-gray-400 text-center py-4">Nenhum item adicionado</p>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span class="text-gray-500">Subtotal:</span><strong id="comanda-subtotal">R$ 0,00</strong></div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-500">Desconto:</span>
+                                <input type="number" id="comanda-desconto" step="0.01" value="0" onchange="atualizarComandaTotal()" class="w-24 border rounded px-2 py-1 text-right text-sm">
+                            </div>
+                            <div class="flex justify-between text-lg font-bold border-t pt-2">
+                                <span>Total:</span><span id="comanda-total" class="text-indigo-700">R$ 0,00</span>
+                            </div>
+                        </div>
+                        <select id="comanda-forma" class="w-full border rounded-lg p-2 text-sm mt-3">
+                            <option value="Dinheiro">💵 Dinheiro</option>
+                            <option value="PIX">💠 PIX</option>
+                            <option value="Cartão de Crédito">💳 Cartão de Crédito</option>
+                            <option value="Cartão de Débito">💳 Cartão de Débito</option>
+                            <option value="Fiado">📒 Fiado</option>
+                        </select>
+                        <button onclick="fecharComanda()" class="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2 rounded-lg">
+                            <i data-lucide="check-circle" class="w-4 h-4 inline"></i> Fechar Comanda
+                        </button>
+                        <button onclick="cancelarComanda()" class="w-full mt-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium px-4 py-1.5 rounded-lg">Cancelar</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CAIXA -->
+            <section id="aba-caixa" class="hidden space-y-6">
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">💰 Abertura e Fechamento de Caixa</h2>
+                    <div id="caixa-status" class="mb-4"></div>
+                    <div id="caixa-form-abertura" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Quanto você tinha no caixa quando abriu?</label>
+                            <input type="number" step="0.01" id="caixa-saldo-inicial" class="w-full border rounded-lg p-2 text-sm" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Evento (opcional)</label>
+                            <select id="caixa-evento" class="w-full border rounded-lg p-2 text-sm"><option value="">-- Nenhum --</option></select>
+                        </div>
+                        <button onclick="abrirCaixa()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+                            <i data-lucide="unlock" class="w-4 h-4 inline"></i> Abrir Caixa
+                        </button>
+                    </div>
+                    <div id="caixa-form-fechamento" class="space-y-3 hidden">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="p-3 bg-indigo-50 rounded-lg">
+                                <p class="text-xs text-gray-500">Saldo Inicial</p>
+                                <p id="caixa-info-inicial" class="text-lg font-bold text-indigo-700">R$ 0,00</p>
+                            </div>
+                            <div class="p-3 bg-emerald-50 rounded-lg">
+                                <p class="text-xs text-gray-500">Total em Caixa</p>
+                                <p id="caixa-info-total" class="text-lg font-bold text-emerald-700">R$ 0,00</p>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Saldo Final (contagem)</label>
+                            <input type="number" step="0.01" id="caixa-saldo-final" class="w-full border rounded-lg p-2 text-sm">
+                        </div>
+                        <button onclick="fecharCaixa()" class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+                            <i data-lucide="lock" class="w-4 h-4 inline"></i> Fechar Caixa
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                    <h3 class="font-bold text-gray-900 mb-4">📋 Movimento do Caixa</h3>
+                    <div class="flex gap-2 mb-4 flex-wrap">
+                        <select id="mov-tipo" class="border rounded-lg p-2 text-sm">
+                            <option value="Sangria">Sangria (retirada)</option>
+                            <option value="Reforço">Reforço (entrada)</option>
+                            <option value="Despesa">Despesa</option>
+                        </select>
+                        <input type="text" id="mov-descricao" placeholder="Descrição" class="flex-1 min-w-[150px] border rounded-lg p-2 text-sm">
+                        <input type="number" step="0.01" id="mov-valor" placeholder="Valor" class="w-28 border rounded-lg p-2 text-sm">
+                        <button onclick="lancarMovimento()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-lg">Lançar</button>
+                    </div>
+                    <div id="lista-movimentos" class="space-y-2"></div>
+                </div>
+            </section>
+
+            <!-- FIADOS -->
+            <section id="aba-fiados" class="hidden space-y-6">
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div class="p-6 border-b flex justify-between items-center">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">📒 Fiados - Contas a Receber</h2>
+                            <p class="text-sm text-gray-500">Total a receber: <strong id="fiado-total-geral" class="text-rose-600">R$ 0,00</strong></p>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-600">
+                            <thead class="bg-gray-50 text-gray-700 font-semibold uppercase text-xs">
+                                <tr>
+                                    <th class="p-4">Cliente</th>
+                                    <th class="p-4">Evento</th>
+                                    <th class="p-4">Valor Fiado</th>
+                                    <th class="p-4">Data</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-fiados" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ESTOQUE -->
+            <section id="aba-estoque" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Produtos & Estoque</h2>
+                            <p class="text-sm text-gray-500">Controle de insumos disponíveis, preços e reposição.</p>
+                        </div>
+                        <button onclick="abrirModalProduto()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Cadastrar Produto
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-600">
+                            <thead class="bg-gray-50 text-gray-700 font-semibold uppercase text-xs">
+                                <tr>
+                                    <th class="p-4">SKU</th>
+                                    <th class="p-4">Produto</th>
+                                    <th class="p-4">Categoria</th>
+                                    <th class="p-4">Preço Unit.</th>
+                                    <th class="p-4">Qtd Disponível</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-estoque" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col justify-between h-fit">
+                    <div>
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="alert-circle" class="w-5 h-5 text-indigo-600"></i>
+                            <h3 class="text-md font-bold text-gray-900">Alerta de Reposição</h3>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-4">Itens com quantidade igual ou menor que o mínimo:</p>
+                        <div id="lista-alertas" class="space-y-3"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FORNECEDORES -->
+            <section id="aba-fornecedores" class="hidden space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase text-gray-400">Total Fornecedores</p>
+                            <h3 id="forn-kpi-total" class="text-2xl font-extrabold text-gray-900 mt-1">R$ 0,00</h3>
+                        </div>
+                        <div class="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="truck" class="w-5 h-5"></i></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase text-rose-500">Falta Pagar (A Pagar)</p>
+                            <h3 id="forn-kpi-apagar" class="text-2xl font-extrabold text-rose-600 mt-1">R$ 0,00</h3>
+                        </div>
+                        <div class="p-3 bg-rose-50 text-rose-600 rounded-lg"><i data-lucide="clock" class="w-5 h-5"></i></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase text-emerald-600">Já Pago aos Fornecedores</p>
+                            <h3 id="forn-kpi-pago" class="text-2xl font-extrabold text-emerald-600 mt-1">R$ 0,00</h3>
+                        </div>
+                        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="check-circle" class="w-5 h-5"></i></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div class="p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Gestão de Fornecedores & Preços</h2>
+                            <p class="text-sm text-gray-500">Cadastre parceiros, defina o preço a pagar e entre em contato por WhatsApp ou Ligação.</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="text" onkeyup="filtrarTabela('tabela-fornecedores', this.value)" placeholder="Buscar fornecedor..." class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button onclick="abrirModalFornecedor()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                                <i data-lucide="plus" class="w-4 h-4"></i> Cadastrar Fornecedor
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-600">
+                            <thead class="bg-gray-50 text-gray-700 font-semibold uppercase text-xs">
+                                <tr>
+                                    <th class="p-4">Empresa / Fornecedor</th>
+                                    <th class="p-4">Serviço / Categoria</th>
+                                    <th class="p-4">Contato (WhatsApp & Ligação)</th>
+                                    <th class="p-4">Preço a Pagar</th>
+                                    <th class="p-4">Status Pagamento</th>
+                                    <th class="p-4">Observação</th>
+                                    <th class="p-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-fornecedores" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RELATÓRIOS -->
+            <section id="aba-relatorios" class="hidden space-y-6">
+                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900">Relatório Financeiro, Gastos e Lucro Total</h2>
+                        <p class="text-sm text-gray-500">Entradas por modalidade menos gastos com eventos, fornecedores e despesas extras.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="document.getElementById('modal-despesa').showModal()" class="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                            <i data-lucide="minus-circle" class="w-4 h-4"></i> Lançar Despesa Extra
+                        </button>
+                        <button onclick="window.print()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                            <i data-lucide="printer" class="w-4 h-4"></i> Imprimir Relatório
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs font-bold uppercase text-gray-500">Total Recebido (Entradas)</p>
+                            <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600"><i data-lucide="arrow-down-left" class="w-5 h-5"></i></div>
+                        </div>
+                        <h3 id="rel-recebido" class="text-3xl font-extrabold text-indigo-700 mt-2">R$ 0,00</h3>
+                        <p id="rel-pendente" class="text-xs text-gray-400 mt-1">A receber (pendente): R$ 0,00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs font-bold uppercase text-gray-500">Total Saídas (Eventos + Forn. + Extras)</p>
+                            <div class="p-2 bg-rose-50 rounded-lg text-rose-600"><i data-lucide="arrow-up-right" class="w-5 h-5"></i></div>
+                        </div>
+                        <h3 id="rel-total-despesas" class="text-3xl font-extrabold text-rose-600 mt-2">R$ 0,00</h3>
+                        <p id="rel-detalhe-saidas" class="text-xs text-gray-400 mt-1">Eventos: R$ 0,00 | Forn.: R$ 0,00 | Extras: R$ 0,00</p>
+                    </div>
+                    <div id="card-lucro-liquido" class="bg-indigo-700 text-white p-6 rounded-xl shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs font-bold uppercase text-indigo-200">Lucro Líquido Total</p>
+                            <div class="p-2 bg-white/10 rounded-lg text-white"><i data-lucide="piggy-bank" class="w-5 h-5"></i></div>
+                        </div>
+                        <h3 id="rel-lucro-liquido" class="text-3xl font-extrabold mt-2">R$ 0,00</h3>
+                        <p id="rel-lucro-projetado" class="text-xs text-indigo-200 mt-1">Lucro projetado (c/ pendentes): R$ 0,00</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                    <div class="bg-white p-5 rounded-xl border-l-4 border-l-emerald-500 border border-gray-200 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs font-bold uppercase text-gray-500">Entrou em Dinheiro</p>
+                            <i data-lucide="banknote" class="w-5 h-5 text-emerald-600"></i>
+                        </div>
+                        <h3 id="rel-dinheiro-pago" class="text-2xl font-extrabold text-emerald-600 mt-2">R$ 0,00</h3>
+                        <p id="rel-dinheiro-pendente" class="text-xs text-gray-400 mt-1">Pendente em dinheiro: R$ 0,00</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border-l-4 border-l-indigo-600 border border-gray-200 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs font-bold uppercase text-gray-500">Entrou em PIX</p>
+                            <i data-lucide="qr-code" class="w-5 h-5 text-indigo-600"></i>
+                        </div>
+                        <h3 id="rel-pix-pago" class="text-2xl font-extrabold text-indigo-600 mt-2">R$ 0,00</h3>
+                        <p id="rel-pix-pendente" class="text-xs text-gray-400 mt-1">Pendente em PIX: R$ 0,00</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border-l-4 border-l-purple-600 border border-gray-200 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs font-bold uppercase text-gray-500">Entrou em Cartão</p>
+                            <i data-lucide="credit-card" class="w-5 h-5 text-purple-600"></i>
+                        </div>
+                        <h3 id="rel-cartao-pago" class="text-2xl font-extrabold text-purple-600 mt-2">R$ 0,00</h3>
+                        <p id="rel-cartao-pendente" class="text-xs text-gray-400 mt-1">Pendente em cartão: R$ 0,00</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div class="p-5 border-b border-gray-200 flex items-center justify-between">
+                            <div>
+                                <h3 class="font-bold text-gray-900">Gastos com Eventos, Fornecedores & Despesas</h3>
+                                <p class="text-xs text-gray-500">Todos os custos cadastrados nos eventos, fornecedores e despesas extras.</p>
+                            </div>
+                            <button onclick="document.getElementById('modal-despesa').showModal()" class="text-xs font-semibold text-rose-600 hover:underline">+ Despesa Extra</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-gray-600">
+                                <thead class="bg-gray-50 text-gray-700 font-semibold uppercase text-xs">
+                                    <tr>
+                                        <th class="p-3.5">Descrição</th>
+                                        <th class="p-3.5">Origem / Categoria</th>
+                                        <th class="p-3.5">Situação</th>
+                                        <th class="p-3.5 text-right">Valor</th>
+                                        <th class="p-3.5 text-center">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rel-tabela-despesas" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div class="p-5 border-b border-gray-200">
+                            <h3 class="font-bold text-gray-900">Extrato de Entradas por Cliente</h3>
+                            <p class="text-xs text-gray-500">Modalidade de pagamento e situação de cada cliente.</p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-gray-600">
+                                <thead class="bg-gray-50 text-gray-700 font-semibold uppercase text-xs">
+                                    <tr>
+                                        <th class="p-3.5">Cliente</th>
+                                        <th class="p-3.5">Evento</th>
+                                        <th class="p-3.5">Modalidade</th>
+                                        <th class="p-3.5">Status</th>
+                                        <th class="p-3.5 text-right">Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rel-tabela-extrato" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAIS -->
+    <dialog id="modal-evento" class="rounded-xl p-6 backdrop:bg-gray-900/50 shadow-xl w-full max-w-lg border border-gray-200">
+        <form id="form-evento" class="space-y-4">
+            <input type="hidden" id="ev-id">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="titulo-modal-evento" class="text-lg font-bold text-gray-900">Cadastrar Novo Evento</h3>
+                <button type="button" onclick="document.getElementById('modal-evento').close()" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Nome do Evento</label>
+                <input type="text" id="ev-nome" required class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: Casamento Silva & Souza">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Data</label>
+                    <input type="date" id="ev-data" required class="w-full border rounded-lg p-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Capacidade (pessoas)</label>
+                    <input type="number" id="ev-capacidade" required class="w-full border rounded-lg p-2 text-sm" placeholder="150">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Local</label>
+                    <input type="text" id="ev-local" required class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: Salão Principal">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Preço Gasto no Evento (R$)</label>
+                    <input type="number" step="0.01" id="ev-custo" required class="w-full border rounded-lg p-2 text-sm" placeholder="2500.00" value="0">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Status do Evento</label>
+                    <select id="ev-status" class="w-full border rounded-lg p-2 text-sm">
+                        <option value="Em Planejamento">Em Planejamento</option>
+                        <option value="Confirmado">Confirmado</option>
+                        <option value="Concluído">Concluído</option>
+                        <option value="Cancelado">Cancelado</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Observações / Detalhes</label>
+                    <input type="text" id="ev-obs" class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: Decoração + Buffet">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-4 border-t">
+                <button type="button" onclick="document.getElementById('modal-evento').close()" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">Salvar Evento</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="modal-cliente" class="rounded-xl p-6 backdrop:bg-gray-900/50 shadow-xl w-full max-w-lg border border-gray-200">
+        <form id="form-cliente" class="space-y-4">
+            <input type="hidden" id="cli-id">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="titulo-modal-cliente" class="text-lg font-bold text-gray-900">Cadastrar Novo Cliente</h3>
+                <button type="button" onclick="document.getElementById('modal-cliente').close()" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Nome Completo</label>
+                <input type="text" id="cli-nome" required class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: João da Silva">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">E-mail</label>
+                    <input type="email" id="cli-email" required class="w-full border rounded-lg p-2 text-sm" placeholder="joao@email.com">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">WhatsApp / Telefone</label>
+                    <input type="text" id="cli-telefone" required class="w-full border rounded-lg p-2 text-sm" placeholder="(41) 99999-9999">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Evento Associado</label>
+                    <input type="text" id="cli-evento" required class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: Formatura 2026">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Valor Total (R$)</label>
+                    <input type="number" step="0.01" id="cli-valor" required class="w-full border rounded-lg p-2 text-sm" placeholder="1500.00">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Forma de Pagamento</label>
+                    <select id="cli-forma-pagamento" class="w-full border rounded-lg p-2 text-sm">
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="PIX">PIX</option>
+                        <option value="Cartão de Crédito">Cartão de Crédito</option>
+                        <option value="Cartão de Débito">Cartão de Débito</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Status do Pagamento</label>
+                    <select id="cli-status" class="w-full border rounded-lg p-2 text-sm">
+                        <option value="Pendente">Pendente</option>
+                        <option value="Pago">Pago</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-4 border-t">
+                <button type="button" onclick="document.getElementById('modal-cliente').close()" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">Salvar Cliente</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="modal-fornecedor" class="rounded-xl p-6 backdrop:bg-gray-900/50 shadow-xl w-full max-w-lg border border-gray-200">
+        <form id="form-fornecedor" class="space-y-4">
+            <input type="hidden" id="forn-id">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="titulo-modal-fornecedor" class="text-lg font-bold text-gray-900">Cadastrar Novo Fornecedor</h3>
+                <button type="button" onclick="document.getElementById('modal-fornecedor').close()" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Nome do Fornecedor / Empresa</label>
+                <input type="text" id="forn-nome" required class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: Buffet Sabor & Arte">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Categoria / Serviço</label>
+                    <select id="forn-categoria" class="w-full border rounded-lg p-2 text-sm">
+                        <option value="Buffet & Alimentação">Buffet & Alimentação</option>
+                        <option value="Bebidas">Bebidas</option>
+                        <option value="Som & Iluminação">Som & Iluminação</option>
+                        <option value="Decoração & Flores">Decoração & Flores</option>
+                        <option value="Locação de Móveis">Locação de Móveis</option>
+                        <option value="Segurança / Staff">Segurança / Staff</option>
+                        <option value="Outros Serviços">Outros Serviços</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Telefone / WhatsApp</label>
+                    <input type="text" id="forn-telefone" required class="w-full border rounded-lg p-2 text-sm" placeholder="(41) 98888-8888">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Preço a Pagar (R$)</label>
+                    <input type="number" step="0.01" id="forn-valor" required class="w-full border rounded-lg p-2 text-sm" placeholder="1200.00">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Status do Pagamento</label>
+                    <select id="forn-status" class="w-full border rounded-lg p-2 text-sm">
+                        <option value="A Pagar">A Pagar</option>
+                        <option value="Pago">Pago</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Cidade / Observações</label>
+                <input type="text" id="forn-obs" class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: Curitiba - Entrega no dia do evento">
+            </div>
+            <div class="flex justify-end gap-3 pt-4 border-t">
+                <button type="button" onclick="document.getElementById('modal-fornecedor').close()" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">Salvar Fornecedor</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="modal-despesa" class="rounded-xl p-6 backdrop:bg-gray-900/50 shadow-xl w-full max-w-lg border border-gray-200">
+        <form id="form-despesa" class="space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-bold text-gray-900">Lançar Nova Despesa Extra</h3>
+                <button type="button" onclick="document.getElementById('modal-despesa').close()" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Descrição da Despesa</label>
+                <input type="text" id="desp-descricao" required class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: Combustível / Gelo / Taxa extra">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Categoria</label>
+                    <select id="desp-categoria" class="w-full border rounded-lg p-2 text-sm">
+                        <option value="Buffet & Bebidas">Buffet & Bebidas</option>
+                        <option value="Comida">Comida</option>
+                        <option value="Equipe & Staff">Equipe & Staff</option>
+                        <option value="Som & Iluminação">Som & Iluminação</option>
+                        <option value="Decoração & Materiais">Decoração & Materiais</option>
+                        <option value="Locação / Estrutura">Locação / Estrutura</option>
+                        <option value="Outros Custos">Outros Custos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Valor da Despesa (R$)</label>
+                    <input type="number" step="0.01" id="desp-valor" required class="w-full border rounded-lg p-2 text-sm" placeholder="250.00">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Evento Relacionado (opcional)</label>
+                    <input type="text" id="desp-evento" class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: Casamento Silva">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Data</label>
+                    <input type="date" id="desp-data" class="w-full border rounded-lg p-2 text-sm">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-4 border-t">
+                <button type="button" onclick="document.getElementById('modal-despesa').close()" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium">Salvar Despesa</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- MODAL PRODUTO (AGORA COM CATEGORIA COMIDA) -->
+    <dialog id="modal-produto" class="rounded-xl p-6 backdrop:bg-gray-900/50 shadow-xl w-full max-w-lg border border-gray-200">
+        <form id="form-produto" class="space-y-4">
+            <input type="hidden" id="est-id">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="titulo-modal-produto" class="text-lg font-bold text-gray-900">Cadastrar Novo Produto</h3>
+                <button type="button" onclick="document.getElementById('modal-produto').close()" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">SKU / Código</label>
+                    <input type="text" id="est-sku" required class="w-full border rounded-lg p-2 text-sm" placeholder="PROD-001">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Categoria</label>
+                    <select id="est-categoria" class="w-full border rounded-lg p-2 text-sm">
+                        <option value="Som & Luz">Som & Luz</option>
+                        <option value="Bebidas">Bebidas</option>
+                        <option value="Comida">Comida</option>
+                        <option value="Mobiliário">Mobiliário</option>
+                        <option value="Decoração">Decoração</option>
+                        <option value="Outros">Outros</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Nome do Produto</label>
+                <input type="text" id="est-nome" required class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: Projetor Epson">
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Preço Unit. (R$)</label>
+                    <input type="number" step="0.01" id="est-preco" required class="w-full border rounded-lg p-2 text-sm" placeholder="0.00" value="0">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Qtd Disponível</label>
+                    <input type="number" id="est-disponivel" required class="w-full border rounded-lg p-2 text-sm" placeholder="10">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Qtd Mínima (Alerta)</label>
+                    <input type="number" id="est-minima" required class="w-full border rounded-lg p-2 text-sm" placeholder="5">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-4 border-t">
+                <button type="button" onclick="document.getElementById('modal-produto').close()" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">Salvar Produto</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- ============ SCRIPT PRINCIPAL ============ -->
+    <script>
+        const SUPABASE_URL = 'https://ilralqsyevpdippiltma.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_-0Bz5WPPx3hjhoSA_z89tQ_laaBV5Ps';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let cacheEventos = [];
+        let cacheClientes = [];
+        let cacheEstoque = [];
+        let cacheFornecedores = JSON.parse(localStorage.getItem('fornecedores_backup') || '[]');
+        let cacheDespesas = JSON.parse(localStorage.getItem('despesas_backup') || '[]');
+        let cacheComandas = [];
+        let comandaAtual = { id: null, cliente_id: null, evento_id: null, itens: [] };
+        let caixaAtual = null;
+        let clientesSelecionados = new Set();
+
+        let chartEventosInstance = null;
+        let chartPagamentosInstance = null;
+
+        const titulosAbas = {
+            dashboard: 'Painel',
+            eventos: 'Eventos',
+            clientes: 'Clientes & Pagamentos',
+            pdv: 'PDV / Comandas',
+            caixa: 'Caixa',
+            fiados: 'Fiados - Contas a Receber',
+            estoque: 'Produtos & Estoque',
+            fornecedores: 'Fornecedores & Valores',
+            relatorios: 'Relatórios Financeiros & Lucro'
+        };
+
+        function navegarPara(aba) {
+            const todasAbas = Object.keys(titulosAbas);
+            todasAbas.forEach(a => {
+                const el = document.getElementById(`aba-${a}`);
+                if (el) el.classList.toggle('hidden', a !== aba);
+            });
+            document.getElementById('titulo-pagina').innerText = titulosAbas[aba] || 'Painel';
+            document.getElementById('breadcrumb-atual').innerText = titulosAbas[aba] || 'Painel';
+            document.querySelectorAll('#menu-navegacao button').forEach(btn => {
+                btn.className = "w-full flex items-center justify-between px-3.5 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-lg text-sm font-medium transition-colors";
+            });
+            const btnAtivo = document.getElementById(`nav-${aba}`);
+            if (btnAtivo) btnAtivo.className = "w-full flex items-center justify-between px-3.5 py-2.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-semibold transition-colors";
+            if (aba === 'relatorios') atualizarRelatorios();
+            if (aba === 'dashboard') atualizarGraficosDashboard();
+            if (aba === 'pdv') { renderizarProdutosPDV(); carregarComandas(); }
+            if (aba === 'caixa') carregarCaixa();
+            if (aba === 'fiados') carregarFiados();
+        }
+
+        function executarBuscaGlobal(termo) {
+            const q = termo.toLowerCase().trim();
+            if (!q) return;
+            if (cacheClientes.some(c => (c.nome || '').toLowerCase().includes(q))) {
+                navegarPara('clientes'); filtrarTabela('tabela-clientes', q);
+            } else if (cacheFornecedores.some(f => (f.nome || '').toLowerCase().includes(q))) {
+                navegarPara('fornecedores'); filtrarTabela('tabela-fornecedores', q);
+            } else if (cacheEventos.some(e => (e.nome || '').toLowerCase().includes(q))) {
+                navegarPara('eventos'); filtrarTabela('tabela-eventos', q);
+            }
+        }
+
+        function filtrarTabela(idTbody, termo) {
+            const filtro = termo.toLowerCase();
+            document.querySelectorAll(`#${idTbody} tr`).forEach(tr => {
+                tr.style.display = tr.innerText.toLowerCase().includes(filtro) ? '' : 'none';
+            });
+        }
+
+        function gerarLinkWhatsApp(telefone, nome, tipo = 'cliente') {
+            const numeros = (telefone || '').replace(/\D/g, '');
+            const ddi = numeros.startsWith('55') ? numeros : `55${numeros}`;
+            let texto;
+            if (tipo === 'fornecedor') texto = `Olá ${nome}, tudo bem? Entramos em contato sobre o serviço/fornecimento para nosso evento.`;
+            else if (tipo === 'cobranca') texto = `Olá ${nome}, tudo bem? Passando para lembrar do valor pendente (fiado) referente ao seu evento. Podemos acertar?`;
+            else texto = `Olá ${nome}, tudo bem? Entramos em contato referente ao seu evento.`;
+            return `https://wa.me/${ddi}?text=${encodeURIComponent(texto)}`;
+        }
+        function gerarLinkLigacao(telefone) { return `tel:${(telefone || '').replace(/\D/g, '')}`; }
+        const fmt = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // ==========================================
+        // EVENTOS
+        // ==========================================
+        function abrirModalEvento(id = null) {
+            document.getElementById('form-evento').reset();
+            document.getElementById('ev-id').value = '';
+            document.getElementById('ev-custo').value = '0';
+            document.getElementById('titulo-modal-evento').innerText = 'Cadastrar Novo Evento';
+            if (id !== null) {
+                const ev = cacheEventos.find(item => String(item.id) === String(id));
+                if (ev) {
+                    document.getElementById('titulo-modal-evento').innerText = 'Editar Evento';
+                    document.getElementById('ev-id').value = ev.id;
+                    document.getElementById('ev-nome').value = ev.nome || '';
+                    document.getElementById('ev-data').value = ev.data || '';
+                    document.getElementById('ev-capacidade').value = ev.capacidade || '';
+                    document.getElementById('ev-local').value = ev.local || '';
+                    document.getElementById('ev-custo').value = ev.custo || 0;
+                    document.getElementById('ev-status').value = ev.status || 'Em Planejamento';
+                    document.getElementById('ev-obs').value = ev.observacoes || '';
+                }
+            }
+            document.getElementById('modal-evento').showModal();
+        }
+
+        async function carregarEventos() {
+            const { data: eventos, error } = await _supabase.from('eventos').select('*').order('data', { ascending: true });
+            if (error) return console.error('Erro eventos:', error);
+            cacheEventos = (eventos || []).map(ev => {
+                const local = localStorage.getItem(`custo_ev_${ev.id}`);
+                return { ...ev, custo: ev.custo !== undefined && ev.custo !== null ? Number(ev.custo) : (local ? Number(local) : 0) };
+            });
+            const tbody = document.getElementById('tabela-eventos');
+            const tbodyResumo = document.getElementById('tabela-resumo-eventos');
+            tbody.innerHTML = ''; tbodyResumo.innerHTML = '';
+            let confirmados = 0, totalGastoEventos = 0;
+            if (cacheEventos.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-400">Nenhum evento cadastrado ainda.</td></tr>`;
+                tbodyResumo.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-gray-400">Nenhum evento para exibir.</td></tr>`;
+            }
+            cacheEventos.forEach((ev, idx) => {
+                if (ev.status === 'Confirmado') confirmados++;
+                const custoNum = Number(ev.custo || 0);
+                totalGastoEventos += custoNum;
+                const dataFormatada = ev.data ? new Date(ev.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-';
+                const custoFormatado = fmt(custoNum);
+                let badgeColor = 'bg-amber-100 text-amber-800';
+                if (ev.status === 'Confirmado') badgeColor = 'bg-emerald-100 text-emerald-800';
+                if (ev.status === 'Concluído') badgeColor = 'bg-indigo-100 text-indigo-800';
+                if (ev.status === 'Cancelado') badgeColor = 'bg-red-100 text-red-800';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-semibold text-gray-900">${ev.nome}</td>
+                        <td class="p-4">${dataFormatada}</td>
+                        <td class="p-4">${ev.local}</td>
+                        <td class="p-4">${ev.capacidade} pessoas</td>
+                        <td class="p-4 font-bold text-rose-600">${custoFormatado}</td>
+                        <td class="p-4 text-xs text-gray-500 max-w-xs truncate">${ev.observacoes || '—'}</td>
+                        <td class="p-4"><span class="px-2.5 py-1 text-xs font-medium ${badgeColor} rounded-full">${ev.status}</span></td>
+                        <td class="p-4 text-center space-x-1">
+                            <button onclick="abrirModalEvento('${ev.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"><i data-lucide="pencil" class="w-4 h-4 inline"></i></button>
+                            <button onclick="deletarItem('eventos', '${ev.id}')" class="p-1.5 text-red-500 hover:bg-red-50 rounded"><i data-lucide="trash-2" class="w-4 h-4 inline"></i></button>
+                        </td>
+                    </tr>`;
+                if (idx < 4) {
+                    const clientesDoEvento = cacheClientes.filter(c => (c.evento_associado || '').toLowerCase() === (ev.nome || '').toLowerCase()).length;
+                    const cap = ev.capacidade || 100;
+                    const pct = Math.min(100, Math.round((clientesDoEvento / cap) * 100));
+                    tbodyResumo.innerHTML += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-3.5"><div class="font-semibold text-indigo-700">${ev.nome}</div><div class="text-[11px] text-gray-400">Data: ${dataFormatada}</div></td>
+                            <td class="p-3.5 text-xs font-medium text-gray-700">${ev.local}</td>
+                            <td class="p-3.5 text-xs font-bold text-rose-600">${custoFormatado}</td>
+                            <td class="p-3.5">
+                                <div class="text-xs font-bold text-gray-700">${pct}% <span class="font-normal text-gray-400">(${clientesDoEvento}/${cap} vagas)</span></div>
+                                <div class="w-28 h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden"><div class="h-full bg-indigo-600 rounded-full" style="width: ${pct}%"></div></div>
+                            </td>
+                            <td class="p-3.5"><span class="px-2.5 py-1 text-[11px] font-semibold ${badgeColor} rounded-md">${ev.status}</span></td>
+                            <td class="p-3.5 text-center"><button onclick="abrirModalEvento('${ev.id}')" class="p-1 text-gray-400 hover:text-indigo-600"><i data-lucide="more-vertical" class="w-4 h-4 inline"></i></button></td>
+                        </tr>`;
+                }
+            });
+            document.getElementById('kpi-eventos').innerText = cacheEventos.length;
+            document.getElementById('kpi-eventos-confirmados').innerText = confirmados;
+            document.getElementById('badge-menu-eventos').innerText = cacheEventos.length;
+            document.getElementById('ev-total-gastos').innerText = fmt(totalGastoEventos);
+            const optEv = cacheEventos.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
+            document.getElementById('pdv-evento').innerHTML = `<option value="">-- Selecione o evento --</option>` + optEv;
+            document.getElementById('caixa-evento').innerHTML = `<option value="">-- Nenhum --</option>` + optEv;
+            atualizarRelatorios(); atualizarGraficosDashboard();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        document.getElementById('form-evento').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('ev-id').value;
+            const custoNum = parseFloat(document.getElementById('ev-custo').value) || 0;
+            const dadosEvento = {
+                nome: document.getElementById('ev-nome').value,
+                data: document.getElementById('ev-data').value,
+                capacidade: parseInt(document.getElementById('ev-capacidade').value),
+                local: document.getElementById('ev-local').value,
+                custo: custoNum,
+                status: document.getElementById('ev-status').value,
+                observacoes: document.getElementById('ev-obs').value
+            };
+            let res = id ? await _supabase.from('eventos').update(dadosEvento).eq('id', id).select() : await _supabase.from('eventos').insert([dadosEvento]).select();
+            if (res.error && (res.error.message.includes('observacoes') || res.error.message.includes('custo'))) {
+                const s = { ...dadosEvento }; delete s.observacoes; delete s.custo;
+                res = id ? await _supabase.from('eventos').update(s).eq('id', id).select() : await _supabase.from('eventos').insert([s]).select();
+            }
+            if (!res.error) {
+                if (res.data && res.data[0]) localStorage.setItem(`custo_ev_${res.data[0].id}`, String(custoNum));
+                else if (id) localStorage.setItem(`custo_ev_${id}`, String(custoNum));
+                document.getElementById('modal-evento').close();
+                document.getElementById('form-evento').reset();
+                carregarEventos();
+            } else alert('Erro ao salvar evento: ' + res.error.message);
+        });
+
+        // ==========================================
+        // CLIENTES
+        // ==========================================
+        function abrirModalCliente(id = null) {
+            document.getElementById('form-cliente').reset();
+            document.getElementById('cli-id').value = '';
+            document.getElementById('titulo-modal-cliente').innerText = 'Cadastrar Novo Cliente';
+            if (id !== null) {
+                const cli = cacheClientes.find(item => String(item.id) === String(id));
+                if (cli) {
+                    document.getElementById('titulo-modal-cliente').innerText = 'Editar Cliente';
+                    document.getElementById('cli-id').value = cli.id;
+                    document.getElementById('cli-nome').value = cli.nome || '';
+                    document.getElementById('cli-email').value = cli.email || '';
+                    document.getElementById('cli-telefone').value = cli.telefone || '';
+                    document.getElementById('cli-evento').value = cli.evento_associado || '';
+                    document.getElementById('cli-valor').value = cli.valor_total || '';
+                    document.getElementById('cli-forma-pagamento').value = cli.forma_pagamento || 'Dinheiro';
+                    document.getElementById('cli-status').value = cli.status_pagamento || 'Pendente';
+                }
+            }
+            document.getElementById('modal-cliente').showModal();
+        }
+
+        function alternarSelecaoCliente(id) {
+            const s = String(id);
+            clientesSelecionados.has(s) ? clientesSelecionados.delete(s) : clientesSelecionados.add(s);
+            atualizarBarraSelecaoClientes();
+        }
+        function alternarTodosClientes(master) {
+            if (master.checked) cacheClientes.forEach(c => clientesSelecionados.add(String(c.id)));
+            else clientesSelecionados.clear();
+            carregarClientes();
+        }
+        function limparSelecaoClientes() {
+            clientesSelecionados.clear();
+            const m = document.getElementById('selecionar-todos-clientes'); if (m) m.checked = false;
+            carregarClientes();
+        }
+        function atualizarBarraSelecaoClientes() {
+            const barra = document.getElementById('barra-selecao-clientes');
+            if (clientesSelecionados.size === 0) { barra.classList.add('hidden'); return; }
+            barra.classList.remove('hidden');
+            document.getElementById('qtd-clientes-marcados').innerText = clientesSelecionados.size;
+            let soma = 0;
+            cacheClientes.forEach(c => { if (clientesSelecionados.has(String(c.id))) soma += Number(c.valor_total || 0); });
+            document.getElementById('soma-clientes-marcados').innerText = fmt(soma);
+        }
+        async function marcarSelecionadosComoPagos() {
+            const ids = Array.from(clientesSelecionados);
+            if (!ids.length) return;
+            const { error } = await _supabase.from('clientes').update({ status_pagamento: 'Pago' }).in('id', ids);
+            if (!error) { clientesSelecionados.clear(); carregarClientes(); }
+            else alert('Erro: ' + error.message);
+        }
+        async function apagarClientesSelecionados() {
+            const ids = Array.from(clientesSelecionados);
+            if (!ids.length || !confirm(`Apagar ${ids.length} cliente(s)?`)) return;
+            const { error } = await _supabase.from('clientes').delete().in('id', ids);
+            if (error) alert('Erro: ' + error.message);
+            else {
+                ids.forEach(id => localStorage.removeItem(`pag_cli_${id}`));
+                clientesSelecionados.clear();
+                const m = document.getElementById('selecionar-todos-clientes'); if (m) m.checked = false;
+                await carregarClientes(); await carregarEventos();
+            }
+        }
+        async function alterarFormaPagamentoDireto(id, novaForma) {
+            const cli = cacheClientes.find(c => String(c.id) === String(id));
+            if (cli) cli.forma_pagamento = novaForma;
+            localStorage.setItem(`pag_cli_${id}`, novaForma);
+            const { error } = await _supabase.from('clientes').update({ forma_pagamento: novaForma }).eq('id', id);
+            if (error) console.warn('Salvo localmente');
+            carregarClientes();
+        }
+        async function alternarStatusPagamento(id, statusAtual) {
+            const novo = statusAtual === 'Pago' ? 'Pendente' : 'Pago';
+            const { error } = await _supabase.from('clientes').update({ status_pagamento: novo }).eq('id', id);
+            if (!error) carregarClientes();
+        }
+
+        async function carregarClientes() {
+            const { data: clientes, error } = await _supabase.from('clientes').select('*').order('created_at', { ascending: false });
+            if (error) return console.error('Erro clientes:', error);
+            cacheClientes = (clientes || []).map(c => ({
+                ...c, forma_pagamento: c.forma_pagamento || localStorage.getItem(`pag_cli_${c.id}`) || 'Dinheiro'
+            }));
+            const tbody = document.getElementById('tabela-clientes');
+            tbody.innerHTML = '';
+            let totalPagos = 0;
+            if (cacheClientes.length === 0) tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-400">Nenhum cliente cadastrado ainda.</td></tr>`;
+            cacheClientes.forEach(cli => {
+                const isPago = cli.status_pagamento === 'Pago';
+                if (isPago) totalPagos++;
+                const idStr = String(cli.id);
+                const isChecked = clientesSelecionados.has(idStr);
+                const badgeColor = isPago ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800';
+                const valorFormatado = fmt(cli.valor_total);
+                const forma = cli.forma_pagamento;
+                const linkZap = gerarLinkWhatsApp(cli.telefone, cli.nome, 'cliente');
+                const linkTel = gerarLinkLigacao(cli.telefone);
+                let selectStyle = 'bg-gray-50 border-gray-200 text-gray-700';
+                if (forma === 'Dinheiro') selectStyle = 'bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold';
+                else if (forma === 'PIX') selectStyle = 'bg-indigo-50 border-indigo-300 text-indigo-800 font-semibold';
+                else if (forma.includes('Cartão')) selectStyle = 'bg-purple-50 border-purple-300 text-purple-800 font-semibold';
+                tbody.innerHTML += `
+                    <tr class="${isChecked ? 'bg-indigo-50/60' : 'hover:bg-gray-50'} transition-colors">
+                        <td class="p-4"><input type="checkbox" ${isChecked ? 'checked' : ''} onchange="alternarSelecaoCliente('${cli.id}')" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"></td>
+                        <td class="p-4">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-semibold text-gray-900">${cli.nome}</span>
+                                <a href="${linkZap}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-full transition-colors"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i> WhatsApp</a>
+                                <a href="${linkTel}" class="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-full transition-colors"><i data-lucide="phone" class="w-3.5 h-3.5"></i> Ligar</a>
+                            </div>
+                        </td>
+                        <td class="p-4 text-xs"><div>${cli.email}</div><div class="text-gray-500 font-medium">${cli.telefone}</div></td>
+                        <td class="p-4">${cli.evento_associado}</td>
+                        <td class="p-4 font-semibold text-gray-800">${valorFormatado}</td>
+                        <td class="p-4">
+                            <select onchange="alterarFormaPagamentoDireto('${cli.id}', this.value)" class="text-xs border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer ${selectStyle}">
+                                <option value="Dinheiro" ${forma === 'Dinheiro' ? 'selected' : ''}>💵 Dinheiro</option>
+                                <option value="PIX" ${forma === 'PIX' ? 'selected' : ''}>💠 PIX</option>
+                                <option value="Cartão de Crédito" ${forma === 'Cartão de Crédito' ? 'selected' : ''}>💳 Cartão de Crédito</option>
+                                <option value="Cartão de Débito" ${forma === 'Cartão de Débito' ? 'selected' : ''}>💳 Cartão de Débito</option>
+                            </select>
+                        </td>
+                        <td class="p-4"><button onclick="alternarStatusPagamento('${cli.id}', '${cli.status_pagamento}')" class="px-2.5 py-1 text-xs font-medium ${badgeColor} rounded-full hover:opacity-80 transition">${cli.status_pagamento}</button></td>
+                        <td class="p-4 text-center space-x-1">
+                            <button type="button" onclick="abrirModalCliente('${cli.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"><i data-lucide="pencil" class="w-4 h-4 inline"></i></button>
+                            <button type="button" onclick="deletarItem('clientes', '${cli.id}')" class="p-1.5 text-red-500 hover:bg-red-50 rounded"><i data-lucide="trash-2" class="w-4 h-4 inline"></i></button>
+                        </td>
+                    </tr>`;
+            });
+            document.getElementById('kpi-pagos').innerText = totalPagos;
+            document.getElementById('badge-menu-clientes').innerText = cacheClientes.length;
+            document.getElementById('pdv-cliente').innerHTML = `<option value="">-- Selecione o cliente --</option>` +
+                cacheClientes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+            atualizarBarraSelecaoClientes(); atualizarRelatorios(); atualizarGraficosDashboard();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        document.getElementById('form-cliente').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('cli-id').value;
+            const forma = document.getElementById('cli-forma-pagamento').value;
+            const dadosCliente = {
+                nome: document.getElementById('cli-nome').value,
+                email: document.getElementById('cli-email').value,
+                telefone: document.getElementById('cli-telefone').value,
+                evento_associado: document.getElementById('cli-evento').value,
+                valor_total: parseFloat(document.getElementById('cli-valor').value),
+                forma_pagamento: forma,
+                status_pagamento: document.getElementById('cli-status').value
+            };
+            let res = id ? await _supabase.from('clientes').update(dadosCliente).eq('id', id).select() : await _supabase.from('clientes').insert([dadosCliente]).select();
+            if (res.error && res.error.message.includes('forma_pagamento')) {
+                delete dadosCliente.forma_pagamento;
+                res = id ? await _supabase.from('clientes').update(dadosCliente).eq('id', id).select() : await _supabase.from('clientes').insert([dadosCliente]).select();
+            }
+            if (!res.error) {
+                if (res.data && res.data[0]) localStorage.setItem(`pag_cli_${res.data[0].id}`, forma);
+                document.getElementById('modal-cliente').close();
+                document.getElementById('form-cliente').reset();
+                carregarClientes();
+            } else alert('Erro: ' + res.error.message);
+        });
+
+        // ==========================================
+        // FORNECEDORES
+        // ==========================================
+        function abrirModalFornecedor(id = null) {
+            document.getElementById('form-fornecedor').reset();
+            document.getElementById('forn-id').value = '';
+            document.getElementById('titulo-modal-fornecedor').innerText = 'Cadastrar Novo Fornecedor';
+            if (id !== null) {
+                const f = cacheFornecedores.find(item => String(item.id) === String(id));
+                if (f) {
+                    document.getElementById('titulo-modal-fornecedor').innerText = 'Editar Fornecedor';
+                    document.getElementById('forn-id').value = f.id;
+                    document.getElementById('forn-nome').value = f.nome || '';
+                    document.getElementById('forn-categoria').value = f.categoria || 'Buffet & Alimentação';
+                    document.getElementById('forn-telefone').value = f.telefone || '';
+                    document.getElementById('forn-valor').value = f.valor || 0;
+                    document.getElementById('forn-status').value = f.status_pagamento || 'A Pagar';
+                    document.getElementById('forn-obs').value = f.observacoes || '';
+                }
+            }
+            document.getElementById('modal-fornecedor').showModal();
+        }
+        async function alternarStatusFornecedor(id, statusAtual) {
+            const novo = statusAtual === 'Pago' ? 'A Pagar' : 'Pago';
+            const idStr = String(id);
+            const item = cacheFornecedores.find(f => String(f.id) === idStr);
+            if (item) item.status_pagamento = novo;
+            localStorage.setItem(`forn_extra_${idStr}`, JSON.stringify({ valor: item ? item.valor : 0, status_pagamento: novo }));
+            if (!idStr.startsWith('local_')) await _supabase.from('fornecedores').update({ status_pagamento: novo }).eq('id', id);
+            localStorage.setItem('fornecedores_backup', JSON.stringify(cacheFornecedores));
+            renderizarFornecedores(); atualizarRelatorios();
+        }
+        async function carregarFornecedores() {
+            const { data, error } = await _supabase.from('fornecedores').select('*').order('created_at', { ascending: false });
+            if (!error && data) {
+                cacheFornecedores = data.map(f => {
+                    const bk = JSON.parse(localStorage.getItem(`forn_extra_${f.id}`) || 'null');
+                    return {
+                        ...f,
+                        valor: f.valor !== undefined && f.valor !== null ? Number(f.valor) : (bk ? Number(bk.valor) : 0),
+                        status_pagamento: f.status_pagamento || (bk ? bk.status_pagamento : 'A Pagar')
+                    };
+                });
+            }
+            renderizarFornecedores(); atualizarRelatorios();
+        }
+        function renderizarFornecedores() {
+            const tbody = document.getElementById('tabela-fornecedores');
+            tbody.innerHTML = '';
+            let totalGeral = 0, totalAPagar = 0, totalPago = 0;
+            cacheFornecedores.forEach(f => {
+                const v = Number(f.valor || 0);
+                totalGeral += v;
+                if (f.status_pagamento === 'Pago') totalPago += v; else totalAPagar += v;
+            });
+            document.getElementById('forn-kpi-total').innerText = fmt(totalGeral);
+            document.getElementById('forn-kpi-apagar').innerText = fmt(totalAPagar);
+            document.getElementById('forn-kpi-pago').innerText = fmt(totalPago);
+            document.getElementById('badge-menu-fornecedores').innerText = cacheFornecedores.length;
+            if (cacheFornecedores.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-400">Nenhum fornecedor cadastrado.</td></tr>`;
+                return;
+            }
+            cacheFornecedores.forEach(f => {
+                const linkZap = gerarLinkWhatsApp(f.telefone, f.nome, 'fornecedor');
+                const linkTel = gerarLinkLigacao(f.telefone);
+                const isPago = f.status_pagamento === 'Pago';
+                const statusBadge = isPago ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-semibold text-gray-900">${f.nome}</td>
+                        <td class="p-4"><span class="px-2.5 py-1 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full">${f.categoria}</span></td>
+                        <td class="p-4">
+                            <div class="text-xs font-medium text-gray-700 mb-1.5">${f.telefone}</div>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <a href="${linkZap}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg transition-colors"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i> WhatsApp</a>
+                                <a href="${linkTel}" class="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"><i data-lucide="phone" class="w-3.5 h-3.5"></i> Ligar</a>
+                            </div>
+                        </td>
+                        <td class="p-4 font-bold text-gray-900">${fmt(f.valor)}</td>
+                        <td class="p-4"><button onclick="alternarStatusFornecedor('${f.id}', '${f.status_pagamento || 'A Pagar'}')" class="px-2.5 py-1 text-xs font-semibold ${statusBadge} rounded-full hover:opacity-80 transition">${f.status_pagamento || 'A Pagar'}</button></td>
+                        <td class="p-4 text-xs text-gray-500 max-w-xs truncate">${f.observacoes || '—'}</td>
+                        <td class="p-4 text-center space-x-1">
+                            <button type="button" onclick="abrirModalFornecedor('${f.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"><i data-lucide="pencil" class="w-4 h-4 inline"></i></button>
+                            <button type="button" onclick="removerFornecedor('${f.id}')" class="p-1.5 text-red-500 hover:bg-red-50 rounded"><i data-lucide="trash-2" class="w-4 h-4 inline"></i></button>
+                        </td>
+                    </tr>`;
+            });
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+        document.getElementById('form-fornecedor').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('forn-id').value;
+            const valorNum = parseFloat(document.getElementById('forn-valor').value) || 0;
+            const statusPag = document.getElementById('forn-status').value;
+            const dadosForn = {
+                nome: document.getElementById('forn-nome').value,
+                categoria: document.getElementById('forn-categoria').value,
+                telefone: document.getElementById('forn-telefone').value,
+                valor: valorNum,
+                status_pagamento: statusPag,
+                observacoes: document.getElementById('forn-obs').value
+            };
+            const idStr = String(id);
+            let res;
+            if (id && !idStr.startsWith('local_')) {
+                res = await _supabase.from('fornecedores').update(dadosForn).eq('id', id).select();
+                if (res.error && (res.error.message.includes('valor') || res.error.message.includes('status_pagamento'))) {
+                    const s = { ...dadosForn }; delete s.valor; delete s.status_pagamento;
+                    res = await _supabase.from('fornecedores').update(s).eq('id', id).select();
+                }
+            } else if (!id) {
+                res = await _supabase.from('fornecedores').insert([dadosForn]).select();
+                if (res.error && (res.error.message.includes('valor') || res.error.message.includes('status_pagamento'))) {
+                    const s = { ...dadosForn }; delete s.valor; delete s.status_pagamento;
+                    res = await _supabase.from('fornecedores').insert([s]).select();
+                }
+            }
+            if (res && !res.error && res.data && res.data[0]) {
+                localStorage.setItem(`forn_extra_${res.data[0].id}`, JSON.stringify({ valor: valorNum, status_pagamento: statusPag }));
+                await carregarFornecedores();
+            } else {
+                if (id) {
+                    const idx = cacheFornecedores.findIndex(f => String(f.id) === idStr);
+                    if (idx !== -1) cacheFornecedores[idx] = { ...cacheFornecedores[idx], ...dadosForn };
+                } else {
+                    dadosForn.id = 'local_' + Date.now();
+                    cacheFornecedores.unshift(dadosForn);
+                }
+                localStorage.setItem('fornecedores_backup', JSON.stringify(cacheFornecedores));
+                renderizarFornecedores(); atualizarRelatorios();
+            }
+            document.getElementById('modal-fornecedor').close();
+            document.getElementById('form-fornecedor').reset();
+        });
+        async function removerFornecedor(id) {
+            if (!confirm('Excluir este fornecedor?')) return;
+            const idStr = String(id);
+            if (!idStr.startsWith('local_')) await _supabase.from('fornecedores').delete().eq('id', id);
+            localStorage.removeItem(`forn_extra_${idStr}`);
+            cacheFornecedores = cacheFornecedores.filter(f => String(f.id) !== idStr);
+            localStorage.setItem('fornecedores_backup', JSON.stringify(cacheFornecedores));
+            renderizarFornecedores(); atualizarRelatorios();
+        }
+
+        // ==========================================
+        // DESPESAS
+        // ==========================================
+        async function carregarDespesas() {
+            const { data, error } = await _supabase.from('despesas').select('*').order('created_at', { ascending: false });
+            if (!error && data) cacheDespesas = data;
+            atualizarRelatorios();
+        }
+        document.getElementById('form-despesa').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nova = {
+                descricao: document.getElementById('desp-descricao').value,
+                categoria: document.getElementById('desp-categoria').value,
+                valor: parseFloat(document.getElementById('desp-valor').value),
+                evento: document.getElementById('desp-evento').value || 'Geral',
+                data: document.getElementById('desp-data').value || new Date().toISOString().split('T')[0]
+            };
+            const { data, error } = await _supabase.from('despesas').insert([nova]).select();
+            if (error) { nova.id = 'local_' + Date.now(); cacheDespesas.unshift(nova); localStorage.setItem('despesas_backup', JSON.stringify(cacheDespesas)); }
+            else if (data && data[0]) cacheDespesas.unshift(data[0]);
+            document.getElementById('modal-despesa').close();
+            document.getElementById('form-despesa').reset();
+            atualizarRelatorios();
+        });
+        async function removerDespesa(id) {
+            if (!confirm('Excluir esta despesa?')) return;
+            const idStr = String(id);
+            if (!idStr.startsWith('local_')) await _supabase.from('despesas').delete().eq('id', id);
+            cacheDespesas = cacheDespesas.filter(d => String(d.id) !== idStr);
+            localStorage.setItem('despesas_backup', JSON.stringify(cacheDespesas));
+            atualizarRelatorios();
+        }
+
+        // ==========================================
+        // ESTOQUE
+        // ==========================================
+        function abrirModalProduto(id = null) {
+            document.getElementById('form-produto').reset();
+            document.getElementById('est-id').value = '';
+            document.getElementById('est-preco').value = '0';
+            document.getElementById('titulo-modal-produto').innerText = 'Cadastrar Novo Produto';
+            if (id !== null) {
+                const item = cacheEstoque.find(p => String(p.id) === String(id));
+                if (item) {
+                    document.getElementById('titulo-modal-produto').innerText = 'Editar Produto';
+                    document.getElementById('est-id').value = item.id;
+                    document.getElementById('est-sku').value = item.sku || '';
+                    document.getElementById('est-categoria').value = item.categoria || 'Som & Luz';
+                    document.getElementById('est-nome').value = item.nome || '';
+                    document.getElementById('est-preco').value = item.preco || 0;
+                    document.getElementById('est-disponivel').value = item.qtd_disponivel || 0;
+                    document.getElementById('est-minima').value = item.qtd_minima || 0;
+                }
+            }
+            document.getElementById('modal-produto').showModal();
+        }
+        async function carregarEstoque() {
+            const { data: estoque, error } = await _supabase.from('estoque').select('*');
+            if (error) return console.error('Erro estoque:', error);
+            cacheEstoque = (estoque || []).map(item => {
+                const local = localStorage.getItem(`preco_est_${item.id}`);
+                return { ...item, preco: item.preco !== undefined && item.preco !== null ? Number(item.preco) : (local ? Number(local) : 0) };
+            });
+            const tbody = document.getElementById('tabela-estoque');
+            const containerAlertas = document.getElementById('lista-alertas');
+            tbody.innerHTML = ''; containerAlertas.innerHTML = '';
+            let countAlerta = 0;
+            if (cacheEstoque.length === 0) tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-400">Nenhum produto cadastrado.</td></tr>`;
+            cacheEstoque.forEach(item => {
+                const emAlerta = item.qtd_disponivel <= item.qtd_minima;
+                if (emAlerta) countAlerta++;
+                const statusBadge = emAlerta
+                    ? '<span class="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded">Crítico</span>'
+                    : '<span class="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded">OK</span>';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-mono text-xs text-gray-500">${item.sku}</td>
+                        <td class="p-4 font-medium text-gray-900">${item.nome}</td>
+                        <td class="p-4">${item.categoria}</td>
+                        <td class="p-4 font-semibold text-gray-800">${fmt(item.preco)}</td>
+                        <td class="p-4">
+                            <div class="flex items-center gap-2">
+                                <button onclick="alterarQtdEstoque('${item.id}', ${item.qtd_disponivel - 1})" class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 font-bold text-gray-700">-</button>
+                                <span class="${emAlerta ? 'text-red-600 font-bold' : 'font-semibold'} min-w-[24px] text-center">${item.qtd_disponivel}</span>
+                                <button onclick="alterarQtdEstoque('${item.id}', ${item.qtd_disponivel + 1})" class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 font-bold text-gray-700">+</button>
+                            </div>
+                        </td>
+                        <td class="p-4">${statusBadge}</td>
+                        <td class="p-4 text-center space-x-1">
+                            <button onclick="abrirModalProduto('${item.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"><i data-lucide="pencil" class="w-4 h-4 inline"></i></button>
+                            <button onclick="deletarItem('estoque', '${item.id}')" class="p-1.5 text-red-500 hover:bg-red-50 rounded"><i data-lucide="trash-2" class="w-4 h-4 inline"></i></button>
+                        </td>
+                    </tr>`;
+                if (emAlerta) {
+                    containerAlertas.innerHTML += `
+                        <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex justify-between items-center">
+                            <div>
+                                <p class="text-sm font-semibold text-indigo-950">${item.nome}</p>
+                                <p class="text-xs text-indigo-700">Restantes: ${item.qtd_disponivel} | Mínimo: ${item.qtd_minima}</p>
+                            </div>
+                        </div>`;
+                }
+            });
+            if (countAlerta === 0) containerAlertas.innerHTML = `<p class="text-xs text-emerald-600 bg-emerald-50 p-3 rounded-lg">Todos os itens estão com estoque adequado.</p>`;
+            document.getElementById('kpi-alerta').innerText = `${countAlerta} Itens`;
+            if (document.getElementById('pdv-cliente')) renderizarProdutosPDV();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+        async function alterarQtdEstoque(id, novaQtd) {
+            if (novaQtd < 0) return;
+            const { error } = await _supabase.from('estoque').update({ qtd_disponivel: novaQtd }).eq('id', id);
+            if (!error) carregarEstoque();
+        }
+        document.getElementById('form-produto').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('est-id').value;
+            const precoNum = parseFloat(document.getElementById('est-preco').value) || 0;
+            const dados = {
+                sku: document.getElementById('est-sku').value,
+                nome: document.getElementById('est-nome').value,
+                categoria: document.getElementById('est-categoria').value,
+                preco: precoNum,
+                qtd_disponivel: parseInt(document.getElementById('est-disponivel').value),
+                qtd_minima: parseInt(document.getElementById('est-minima').value),
+                status: 'OK'
+            };
+            let res = id ? await _supabase.from('estoque').update(dados).eq('id', id).select() : await _supabase.from('estoque').insert([dados]).select();
+            if (res.error && res.error.message.includes('preco')) {
+                const s = { ...dados }; delete s.preco;
+                res = id ? await _supabase.from('estoque').update(s).eq('id', id).select() : await _supabase.from('estoque').insert([s]).select();
+            }
+            if (!res.error) {
+                if (res.data && res.data[0]) localStorage.setItem(`preco_est_${res.data[0].id}`, String(precoNum));
+                else if (id) localStorage.setItem(`preco_est_${id}`, String(precoNum));
+                document.getElementById('modal-produto').close();
+                document.getElementById('form-produto').reset();
+                carregarEstoque();
+            } else alert('Erro: ' + res.error.message);
+        });
+
+        // ==========================================
+        // GRÁFICOS
+        // ==========================================
+        function atualizarGraficosDashboard() {
+            const ctxEv = document.getElementById('grafico-eventos');
+            const ctxPag = document.getElementById('grafico-pagamentos');
+            if (!ctxEv || !ctxPag) return;
+            const mapa = {};
+            cacheEventos.forEach(ev => mapa[ev.nome] = 0);
+            cacheClientes.forEach(c => {
+                const n = c.evento_associado || 'Outros';
+                mapa[n] = (mapa[n] || 0) + Number(c.valor_total || 0);
+            });
+            const labels = Object.keys(mapa).length ? Object.keys(mapa) : ['Sem eventos'];
+            const valores = Object.values(mapa).length ? Object.values(mapa) : [0];
+            if (chartEventosInstance) chartEventosInstance.destroy();
+            chartEventosInstance = new Chart(ctxEv, {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Valor Contratado (R$)', data: valores, backgroundColor: '#4f46e5', borderRadius: 6, maxBarThickness: 42 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } } }
+            });
+            let d = 0, p = 0, c = 0;
+            cacheClientes.forEach(cli => {
+                const v = Number(cli.valor_total || 0);
+                const f = cli.forma_pagamento || 'Dinheiro';
+                if (f === 'Dinheiro') d += v; else if (f === 'PIX') p += v; else c += v;
+            });
+            if (chartPagamentosInstance) chartPagamentosInstance.destroy();
+            chartPagamentosInstance = new Chart(ctxPag, {
+                type: 'doughnut',
+                data: { labels: ['Dinheiro', 'PIX', 'Cartão'], datasets: [{ data: [d, p, c], backgroundColor: ['#10b981', '#4f46e5', '#9333ea'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+            });
+        }
+
+        // ==========================================
+        // RELATÓRIOS
+        // ==========================================
+        function atualizarRelatorios() {
+            let dinheiroPago = 0, dinheiroPendente = 0, pixPago = 0, pixPendente = 0, cartaoPago = 0, cartaoPendente = 0;
+            let totalRecebido = 0, totalPendente = 0;
+            const tbodyExtrato = document.getElementById('rel-tabela-extrato');
+            if (tbodyExtrato) tbodyExtrato.innerHTML = '';
+            cacheClientes.forEach(c => {
+                const v = Number(c.valor_total || 0);
+                const pago = c.status_pagamento === 'Pago';
+                const f = c.forma_pagamento || 'Dinheiro';
+                if (pago) totalRecebido += v; else totalPendente += v;
+                if (f === 'Dinheiro') { if (pago) dinheiroPago += v; else dinheiroPendente += v; }
+                else if (f === 'PIX') { if (pago) pixPago += v; else pixPendente += v; }
+                else { if (pago) cartaoPago += v; else cartaoPendente += v; }
+                if (tbodyExtrato) {
+                    const cls = pago ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800';
+                    tbodyExtrato.innerHTML += `
+                        <tr>
+                            <td class="p-3.5 font-medium text-gray-900">${c.nome}</td>
+                            <td class="p-3.5 text-xs">${c.evento_associado}</td>
+                            <td class="p-3.5 text-xs font-semibold text-indigo-700">${f}</td>
+                            <td class="p-3.5"><span class="px-2 py-0.5 text-xs font-medium ${cls} rounded-full">${c.status_pagamento}</span></td>
+                            <td class="p-3.5 text-right font-bold text-gray-800">${fmt(v)}</td>
+                        </tr>`;
+                }
+            });
+            if (tbodyExtrato && cacheClientes.length === 0) tbodyExtrato.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-400">Nenhum lançamento de cliente registrado.</td></tr>`;
+            let totalGastoEventos = 0, totalFornecedores = 0, totalDespesasExtras = 0;
+            const tbodyDesp = document.getElementById('rel-tabela-despesas');
+            if (tbodyDesp) tbodyDesp.innerHTML = '';
+            cacheEventos.forEach(ev => {
+                const v = Number(ev.custo || 0);
+                totalGastoEventos += v;
+                if (tbodyDesp && v > 0) {
+                    tbodyDesp.innerHTML += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-3.5 font-medium text-gray-900">${ev.nome}</td>
+                            <td class="p-3.5 text-xs"><span class="px-2 py-0.5 bg-purple-50 text-purple-700 rounded">Evento: ${ev.local}</span></td>
+                            <td class="p-3.5"><span class="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">${ev.status}</span></td>
+                            <td class="p-3.5 text-right font-bold text-rose-600">- ${fmt(v)}</td>
+                            <td class="p-3.5 text-center"><button onclick="abrirModalEvento('${ev.id}')" class="p-1 text-indigo-600 hover:bg-indigo-50 rounded"><i data-lucide="pencil" class="w-4 h-4 inline"></i></button></td>
+                        </tr>`;
+                }
+            });
+            cacheFornecedores.forEach(f => {
+                const v = Number(f.valor || 0);
+                totalFornecedores += v;
+                if (tbodyDesp && v > 0) {
+                    const cls = f.status_pagamento === 'Pago' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
+                    tbodyDesp.innerHTML += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-3.5 font-medium text-gray-900">${f.nome}</td>
+                            <td class="p-3.5 text-xs"><span class="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded">Fornecedor: ${f.categoria}</span></td>
+                            <td class="p-3.5"><span class="px-2 py-0.5 text-xs font-medium ${cls} rounded-full">${f.status_pagamento || 'A Pagar'}</span></td>
+                            <td class="p-3.5 text-right font-bold text-rose-600">- ${fmt(v)}</td>
+                            <td class="p-3.5 text-center"><button onclick="abrirModalFornecedor('${f.id}')" class="p-1 text-indigo-600 hover:bg-indigo-50 rounded"><i data-lucide="pencil" class="w-4 h-4 inline"></i></button></td>
+                        </tr>`;
+                }
+            });
+            cacheDespesas.forEach(d => {
+                const v = Number(d.valor || 0);
+                totalDespesasExtras += v;
+                if (tbodyDesp) {
+                    tbodyDesp.innerHTML += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-3.5 font-medium text-gray-900">${d.descricao}</td>
+                            <td class="p-3.5 text-xs"><span class="px-2 py-0.5 bg-rose-50 text-rose-700 rounded">Extra: ${d.categoria}</span></td>
+                            <td class="p-3.5"><span class="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">Lançado</span></td>
+                            <td class="p-3.5 text-right font-bold text-rose-600">- ${fmt(v)}</td>
+                            <td class="p-3.5 text-center"><button onclick="removerDespesa('${d.id}')" class="p-1 text-red-500 hover:bg-red-50 rounded"><i data-lucide="trash-2" class="w-4 h-4 inline"></i></button></td>
+                        </tr>`;
+                }
+            });
+            const totalSaidas = totalGastoEventos + totalFornecedores + totalDespesasExtras;
+            if (tbodyDesp && totalSaidas === 0 && cacheDespesas.length === 0) {
+                tbodyDesp.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-400">Nenhum gasto registrado.</td></tr>`;
+            }
+            const lucro = totalRecebido - totalSaidas;
+            const proj = (totalRecebido + totalPendente) - totalSaidas;
+            document.getElementById('rel-recebido').innerText = fmt(totalRecebido);
+            document.getElementById('rel-pendente').innerText = `A receber (pendente): ${fmt(totalPendente)}`;
+            document.getElementById('rel-total-despesas').innerText = fmt(totalSaidas);
+            document.getElementById('rel-detalhe-saidas').innerText = `Eventos: ${fmt(totalGastoEventos)} | Forn.: ${fmt(totalFornecedores)} | Extras: ${fmt(totalDespesasExtras)}`;
+            document.getElementById('rel-lucro-liquido').innerText = fmt(lucro);
+            document.getElementById('rel-lucro-projetado').innerText = `Lucro projetado (c/ pendentes): ${fmt(proj)}`;
+            document.getElementById('kpi-lucro-dashboard').innerText = fmt(lucro);
+            const cardLucro = document.getElementById('card-lucro-liquido');
+            if (cardLucro) cardLucro.className = lucro < 0 ? "bg-rose-700 text-white p-6 rounded-xl shadow-sm" : "bg-indigo-700 text-white p-6 rounded-xl shadow-sm";
+            document.getElementById('rel-dinheiro-pago').innerText = fmt(dinheiroPago);
+            document.getElementById('rel-dinheiro-pendente').innerText = `Pendente em dinheiro: ${fmt(dinheiroPendente)}`;
+            document.getElementById('rel-pix-pago').innerText = fmt(pixPago);
+            document.getElementById('rel-pix-pendente').innerText = `Pendente em PIX: ${fmt(pixPendente)}`;
+            document.getElementById('rel-cartao-pago').innerText = fmt(cartaoPago);
+            document.getElementById('rel-cartao-pendente').innerText = `Pendente em cartão: ${fmt(cartaoPendente)}`;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        // ==========================================
+        // PDV / COMANDAS
+        // ==========================================
+        async function carregarComandas() {
+            const { data } = await _supabase.from('comandas').select('*').order('created_at', { ascending: false });
+            cacheComandas = data || [];
+            renderizarComandasAbertas();
+            document.getElementById('badge-menu-comandas').innerText = cacheComandas.filter(c => c.status === 'Aberta').length;
+        }
+        function renderizarComandasAbertas() {
+            const c = document.getElementById('lista-comandas-abertas');
+            if (!c) return;
+            const ab = cacheComandas.filter(x => x.status === 'Aberta');
+            if (!ab.length) { c.innerHTML = `<p class="text-xs text-gray-400 text-center py-3">Nenhuma comanda aberta</p>`; return; }
+            c.innerHTML = ab.map(x => {
+                const cli = cacheClientes.find(y => String(y.id) === String(x.cliente_id));
+                return `<div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer hover:bg-amber-100" onclick="selecionarComanda('${x.id}')">
+                    <p class="text-sm font-semibold text-gray-900">${cli ? cli.nome : 'Cliente'}</p>
+                    <p class="text-xs text-gray-500">Total: ${fmt(x.total)}</p>
+                </div>`;
+            }).join('');
+        }
+        function abrirNovaComanda() {
+            const cliId = document.getElementById('pdv-cliente').value;
+            const evId = document.getElementById('pdv-evento').value;
+            if (!cliId) return alert('Selecione um cliente');
+            comandaAtual = { id: null, cliente_id: cliId, evento_id: evId || null, itens: [] };
+            atualizarComandaUI();
+        }
+        function selecionarComanda(id) {
+            const c = cacheComandas.find(x => String(x.id) === String(id));
+            if (!c) return;
+            comandaAtual = { id: c.id, cliente_id: c.cliente_id, evento_id: c.evento_id, itens: [] };
+            carregarItensComanda(c.id);
+        }
+        async function carregarItensComanda(comandaId) {
+            const { data } = await _supabase.from('comanda_itens').select('*').eq('comanda_id', comandaId);
+            comandaAtual.itens = (data || []).map(i => ({
+                produto_id: i.produto_id,
+                nome_produto: i.nome_produto,
+                preco_unit: Number(i.preco_unit || 0),
+                quantidade: Number(i.quantidade || 1),
+                total: Number(i.total || 0)
+            }));
+            atualizarComandaUI();
+        }
+        function adicionarItemComanda(produtoId) {
+            const prod = cacheEstoque.find(p => String(p.id) === String(produtoId));
+            if (!prod) return;
+            if (prod.qtd_disponivel <= 0) return alert('Produto sem estoque!');
+            const ex = comandaAtual.itens.find(i => String(i.produto_id) === String(produtoId));
+            if (ex) {
+                if (ex.quantidade + 1 > prod.qtd_disponivel) return alert('Estoque insuficiente!');
+                ex.quantidade++;
+                ex.total = ex.quantidade * ex.preco_unit;
+            } else {
+                comandaAtual.itens.push({
+                    produto_id: produtoId,
+                    nome_produto: prod.nome,
+                    preco_unit: Number(prod.preco || 0),
+                    quantidade: 1,
+                    total: Number(prod.preco || 0)
+                });
+            }
+            atualizarComandaUI();
+        }
+        function atualizarComandaUI() {
+            const c = document.getElementById('comanda-itens');
+            if (!c) return;
+            if (!comandaAtual.itens.length) {
+                c.innerHTML = `<p class="text-xs text-gray-400 text-center py-4">Nenhum item adicionado</p>`;
+                document.getElementById('comanda-subtotal').innerText = 'R$ 0,00';
+                document.getElementById('comanda-total').innerText = 'R$ 0,00';
+                return;
+            }
+            c.innerHTML = comandaAtual.itens.map((i, idx) => `
+                <div class="flex justify-between items-center text-sm border-b pb-1.5">
+                    <div class="flex-1">
+                        <p class="font-medium text-gray-900">${i.nome_produto}</p>
+                        <p class="text-xs text-gray-500">R$ ${Number(i.preco_unit).toFixed(2)} × ${i.quantidade}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-gray-800">R$ ${Number(i.total).toFixed(2)}</span>
+                        <button onclick="removerItemComanda(${idx})" class="text-red-500 hover:bg-red-50 p-1 rounded">✕</button>
+                    </div>
+                </div>`).join('');
+            const sub = comandaAtual.itens.reduce((s, i) => s + Number(i.total), 0);
+            document.getElementById('comanda-subtotal').innerText = `R$ ${sub.toFixed(2)}`;
+            atualizarComandaTotal();
+        }
+        function removerItemComanda(idx) { comandaAtual.itens.splice(idx, 1); atualizarComandaUI(); }
+        function atualizarComandaTotal() {
+            const sub = comandaAtual.itens.reduce((s, i) => s + Number(i.total), 0);
+            const desc = parseFloat(document.getElementById('comanda-desconto').value) || 0;
+            document.getElementById('comanda-total').innerText = `R$ ${(sub - desc).toFixed(2)}`;
+        }
+
+        async function fecharComanda() {
+            if (!comandaAtual.itens.length) return alert('Adicione itens à comanda');
+
+            const sub = comandaAtual.itens.reduce((s, i) => s + Number(i.total || 0), 0);
+            const desc = parseFloat(document.getElementById('comanda-desconto').value) || 0;
+            const total = sub - desc;
+            const forma = document.getElementById('comanda-forma').value;
+            const status = forma === 'Fiado' ? 'Fiado' : 'Paga';
+
+            console.log('🔍 Iniciando fechamento:', {
+                cliente_id: comandaAtual.cliente_id,
+                evento_id: comandaAtual.evento_id,
+                subtotal: sub,
+                desconto: desc,
+                total: total,
+                forma: forma,
+                status: status,
+                itens: comandaAtual.itens.length
+            });
+
+            const { data: cmd, error: errComanda } = await _supabase
+                .from('comandas')
+                .insert([{
+                    cliente_id: comandaAtual.cliente_id ? Number(comandaAtual.cliente_id) : null,
+                    evento_id: comandaAtual.evento_id ? Number(comandaAtual.evento_id) : null,
+                    status: status,
+                    subtotal: sub,
+                    desconto: desc,
+                    total: total,
+                    forma_pagamento: forma,
+                    fechada_em: new Date().toISOString()
+                }])
+                .select();
+
+            if (errComanda) {
+                console.error('❌ Erro ao inserir comanda:', errComanda);
+                return alert('Erro ao criar comanda:\n' + errComanda.message + '\n\nDetalhes: ' + (errComanda.details || 'sem detalhes') + '\nDica: ' + (errComanda.hint || 'sem dica'));
+            }
+            if (!cmd || !cmd[0]) {
+                console.error('❌ Comanda não retornou dados:', cmd);
+                return alert('Comanda não foi criada — resposta vazia do Supabase.');
+            }
+
+            const comandaId = cmd[0].id;
+            console.log('✅ Comanda criada com ID:', comandaId);
+
+            const itensParaInserir = comandaAtual.itens.map(i => ({
+                comanda_id: Number(comandaId),
+                produto_id: i.produto_id ? Number(i.produto_id) : null,
+                nome_produto: i.nome_produto,
+                preco_unit: Number(i.preco_unit || 0),
+                quantidade: Number(i.quantidade || 1),
+                total: Number(i.total || 0)
+            }));
+
+            console.log('🔍 Inserindo itens:', itensParaInserir);
+
+            const { error: errItens } = await _supabase
+                .from('comanda_itens')
+                .insert(itensParaInserir);
+
+            if (errItens) {
+                console.error('❌ Erro ao inserir itens:', errItens);
+                await _supabase.from('comandas').delete().eq('id', comandaId);
+                return alert('Erro ao inserir itens:\n' + errItens.message + '\n\nDetalhes: ' + (errItens.details || 'sem detalhes'));
+            }
+            console.log('✅ Itens inseridos com sucesso');
+
+            for (const item of comandaAtual.itens) {
+                if (!item.produto_id) continue;
+                const prod = cacheEstoque.find(p => String(p.id) === String(item.produto_id));
+                if (!prod) { console.warn('⚠️ Produto não encontrado:', item.produto_id); continue; }
+                const novaQtd = Number(prod.qtd_disponivel) - Number(item.quantidade);
+                console.log(`📦 Baixa estoque ${prod.nome}: ${prod.qtd_disponivel} → ${novaQtd}`);
+                const { error: errEst } = await _supabase.from('estoque').update({ qtd_disponivel: novaQtd }).eq('id', prod.id);
+                if (errEst) console.error('❌ Erro estoque:', prod.nome, errEst);
+            }
+
+            try {
+                await registrarMovimentoCaixa('Venda', `Comanda #${comandaId}`, total, forma);
+                console.log('✅ Movimento de caixa registrado');
+            } catch (e) {
+                console.warn('⚠️ Caixa não registrado:', e);
+            }
+
+            comandaAtual = { id: null, cliente_id: null, evento_id: null, itens: [] };
+            document.getElementById('comanda-desconto').value = 0;
+            atualizarComandaUI();
+            await carregarEstoque();
+            await carregarComandas();
+            await carregarFiados();
+            alert('✅ Comanda #' + comandaId + ' fechada com sucesso!');
+        }
+
+        function cancelarComanda() {
+            comandaAtual = { id: null, cliente_id: null, evento_id: null, itens: [] };
+            atualizarComandaUI();
+        }
+        function filtrarProdutosPDV(termo) {
+            const q = termo.toLowerCase();
+            document.querySelectorAll('#lista-produtos-pdv > div').forEach(el => {
+                el.style.display = el.innerText.toLowerCase().includes(q) ? '' : 'none';
+            });
+        }
+        function renderizarProdutosPDV() {
+            const c = document.getElementById('lista-produtos-pdv');
+            if (!c) return;
+            c.innerHTML = cacheEstoque.map(p => `
+                <div class="p-2 border rounded-lg cursor-pointer hover:bg-indigo-50 flex justify-between items-center" onclick="adicionarItemComanda('${p.id}')">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">${p.nome}</p>
+                        <p class="text-xs text-gray-500">${p.categoria} • Estoque: ${p.qtd_disponivel}</p>
+                    </div>
+                    <span class="text-sm font-bold text-indigo-700">R$ ${Number(p.preco || 0).toFixed(2)}</span>
+                </div>`).join('') || '<p class="text-xs text-gray-400 text-center py-3">Nenhum produto cadastrado</p>';
+        }
+
+        // ==========================================
+        // CAIXA
+        // ==========================================
+        async function carregarCaixa() {
+            const { data } = await _supabase.from('caixa').select('*').eq('status', 'Aberto').order('aberto_em', { ascending: false }).limit(1);
+            caixaAtual = data && data[0] ? data[0] : null;
+            renderizarCaixa();
+            carregarMovimentos();
+        }
+        function renderizarCaixa() {
+            const st = document.getElementById('caixa-status');
+            const ab = document.getElementById('caixa-form-abertura');
+            const fe = document.getElementById('caixa-form-fechamento');
+            if (!st) return;
+            if (caixaAtual) {
+                st.innerHTML = `<div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800 font-medium">✅ Caixa ABERTO desde ${new Date(caixaAtual.aberto_em).toLocaleString('pt-BR')}</div>`;
+                ab.classList.add('hidden');
+                fe.classList.remove('hidden');
+                document.getElementById('caixa-info-inicial').innerText = fmt(caixaAtual.saldo_inicial);
+                calcularTotalCaixa();
+            } else {
+                st.innerHTML = `<div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 font-medium">⚠️ Caixa FECHADO</div>`;
+                ab.classList.remove('hidden');
+                fe.classList.add('hidden');
+            }
+        }
+        async function abrirCaixa() {
+            const saldo = parseFloat(document.getElementById('caixa-saldo-inicial').value) || 0;
+            const evId = document.getElementById('caixa-evento').value || null;
+            const { error } = await _supabase.from('caixa').insert([{ saldo_inicial: saldo, evento_id: evId, status: 'Aberto' }]);
+            if (error) return alert('Erro: ' + error.message);
+            carregarCaixa();
+        }
+        async function fecharCaixa() {
+            const sf = parseFloat(document.getElementById('caixa-saldo-final').value) || 0;
+            await _supabase.from('caixa').update({ saldo_final: sf, status: 'Fechado', fechado_em: new Date().toISOString() }).eq('id', caixaAtual.id);
+            caixaAtual = null;
+            carregarCaixa();
+        }
+        async function calcularTotalCaixa() {
+            if (!caixaAtual) return;
+            const { data: movs } = await _supabase.from('caixa_movimentos').select('*').eq('caixa_id', caixaAtual.id);
+            let total = Number(caixaAtual.saldo_inicial || 0);
+            (movs || []).forEach(m => {
+                if (m.tipo === 'Venda' || m.tipo === 'Reforço') total += Number(m.valor || 0);
+                else total -= Number(m.valor || 0);
+            });
+            document.getElementById('caixa-info-total').innerText = fmt(total);
+        }
+        async function lancarMovimento() {
+            if (!caixaAtual) return alert('Abra o caixa primeiro');
+            const tipo = document.getElementById('mov-tipo').value;
+            const desc = document.getElementById('mov-descricao').value;
+            const v = parseFloat(document.getElementById('mov-valor').value) || 0;
+            if (v <= 0) return alert('Informe o valor');
+            await registrarMovimentoCaixa(tipo, desc, v, null);
+            document.getElementById('mov-descricao').value = '';
+            document.getElementById('mov-valor').value = '';
+            carregarMovimentos(); calcularTotalCaixa();
+        }
+        async function registrarMovimentoCaixa(tipo, descricao, valor, formaPagamento) {
+            if (!caixaAtual || !caixaAtual.id) {
+                console.log('ℹ️ Caixa fechado — movimento não registrado.');
+                return;
+            }
+            const { error } = await _supabase.from('caixa_movimentos').insert([{
+                caixa_id: Number(caixaAtual.id),
+                tipo: tipo,
+                descricao: descricao,
+                valor: Number(valor || 0),
+                forma_pagamento: formaPagamento
+            }]);
+            if (error) throw error;
+        }
+        async function carregarMovimentos() {
+            if (!caixaAtual) return;
+            const { data } = await _supabase.from('caixa_movimentos').select('*').eq('caixa_id', caixaAtual.id).order('created_at', { ascending: false });
+            const c = document.getElementById('lista-movimentos');
+            if (!c) return;
+            c.innerHTML = (data || []).map(m => `
+                <div class="flex justify-between items-center p-2 border-b text-sm">
+                    <div>
+                        <span class="font-medium">${m.tipo}</span>
+                        <span class="text-xs text-gray-500 ml-2">${m.descricao || ''}</span>
+                    </div>
+                    <span class="font-bold ${m.tipo === 'Sangria' || m.tipo === 'Despesa' ? 'text-rose-600' : 'text-emerald-600'}">
+                        ${m.tipo === 'Sangria' || m.tipo === 'Despesa' ? '-' : '+'} ${fmt(m.valor)}
+                    </span>
+                </div>`).join('') || '<p class="text-xs text-gray-400 text-center py-3">Nenhum movimento</p>';
+        }
+
+        // ==========================================
+        // FIADOS
+        // ==========================================
+        async function carregarFiados() {
+            const { data } = await _supabase.from('comandas').select('*').eq('status', 'Fiado');
+            const c = document.getElementById('tabela-fiados');
+            if (!c) return;
+            let total = 0;
+            c.innerHTML = (data || []).map(x => {
+                const cli = cacheClientes.find(y => String(y.id) === String(x.cliente_id));
+                const ev = cacheEventos.find(y => String(y.id) === String(x.evento_id));
+                total += Number(x.total || 0);
+                const zap = cli ? gerarLinkWhatsApp(cli.telefone, cli.nome, 'cobranca') : '#';
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-medium">${cli ? cli.nome : 'Cliente'}</td>
+                        <td class="p-4 text-xs">${ev ? ev.nome : '-'}</td>
+                        <td class="p-4 font-bold text-rose-600">${fmt(x.total)}</td>
+                        <td class="p-4 text-xs">${new Date(x.created_at).toLocaleDateString('pt-BR')}</td>
+                        <td class="p-4"><span class="px-2 py-0.5 text-xs bg-rose-100 text-rose-800 rounded-full">Fiado</span></td>
+                        <td class="p-4 text-center space-x-1">
+                            <a href="${zap}" target="_blank" class="inline-block px-2 py-1 bg-green-500 text-white text-xs rounded" title="Cobrar via WhatsApp">Cobrar</a>
+                            <button onclick="marcarFiadoPago('${x.id}')" class="px-2 py-1 bg-emerald-600 text-white text-xs rounded">Pago</button>
+                        </td>
+                    </tr>`;
+            }).join('') || '<tr><td colspan="6" class="p-6 text-center text-gray-400">Nenhum fiado em aberto</td></tr>';
+            document.getElementById('fiado-total-geral').innerText = fmt(total);
+            document.getElementById('badge-menu-fiados').innerText = (data || []).length;
+        }
+        async function marcarFiadoPago(id) {
+            await _supabase.from('comandas').update({ status: 'Paga', forma_pagamento: 'Dinheiro' }).eq('id', id);
+            carregarFiados();
+        }
+
+        // ==========================================
+        // EXCLUSÃO GENÉRICA
+        // ==========================================
+        async function deletarItem(tabela, id) {
+            if (!confirm('Excluir este registro?')) return;
+            const { data, error } = await _supabase.from(tabela).delete().eq('id', id).select();
+            if (error) return alert('Erro: ' + error.message);
+            if (!data || data.length === 0) return alert('Não foi possível apagar. Verifique RLS da tabela "' + tabela + '".');
+            if (tabela === 'clientes') {
+                clientesSelecionados.delete(String(id));
+                localStorage.removeItem(`pag_cli_${id}`);
+                await carregarClientes(); await carregarEventos();
+            } else if (tabela === 'eventos') {
+                localStorage.removeItem(`custo_ev_${id}`);
+                await carregarEventos();
+            } else if (tabela === 'estoque') {
+                localStorage.removeItem(`preco_est_${id}`);
+                await carregarEstoque();
+            }
+        }
+
+        // ==========================================
+        // INICIALIZAÇÃO
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', async () => {
+            await carregarClientes();
+            await carregarEventos();
+            await carregarEstoque();
+            await carregarFornecedores();
+            await carregarDespesas();
+            await carregarComandas();
+            await carregarCaixa();
+            await carregarFiados();
+            navegarPara('dashboard');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
